@@ -5,7 +5,8 @@ MPU9250 mpu;
 
 struct SensorData {
 
-    float yaw, pitch, roll; // [0:3]
+    // float yaw, pitch, roll; // [0:3]
+    float gyroX, gyroY, gyroZ; // [0:3]
     float accX, accY, accZ; // [3:6]
     float magX, magY, magZ; // [6:9]
 
@@ -29,7 +30,6 @@ void setup() {
 }
 
 void loop() {
-  
 
   if (mpu.update()) {
     static uint32_t prev_ms = millis();
@@ -54,17 +54,21 @@ void sendSensorData() {
 void updateSensorData() {
   // updates all sensor data with getter()
 
-    sensorData.yaw = mpu.getYaw();
-    sensorData.pitch = mpu.getPitch();
-    sensorData.roll = mpu.getRoll();
+    // sensorData.yaw = mpu.getYaw();
+    // sensorData.pitch = mpu.getPitch();
+    // sensorData.roll = mpu.getRoll();
 
-    sensorData.accX = mpu.getAccX();
-    sensorData.accY = mpu.getAccY();
-    sensorData.accZ = mpu.getAccZ();
+    sensorData.gyroX = mpu.getGyroX();
+    sensorData.gyroY = mpu.getGyroY();
+    sensorData.gyroZ = mpu.getGyroZ();
 
-    sensorData.magX = mpu.getMagX();
-    sensorData.magY = mpu.getMagY();
-    sensorData.magZ = mpu.getMagZ();
+    sensorData.accX  = mpu.getAccX();
+    sensorData.accY  = mpu.getAccY();
+    sensorData.accZ  = mpu.getAccZ();
+
+    sensorData.magX  = mpu.getMagX();
+    sensorData.magY  = mpu.getMagY();
+    sensorData.magZ  = mpu.getMagZ();
 
     sensorData.temperature = mpu.getTemperature();
 }
