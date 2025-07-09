@@ -3,7 +3,9 @@ BOARD_FQBN = esp32:esp32:esp32
 PORT = /dev/ttyUSB0
 BAUD = 115200
 # SKETCH = write-serial.ino
-SKETCH = simple-serial-comm
+# SKETCH = simple-serial-comm
+# SKETCH = send-struct
+SKETCH = send-sensor-data
 BUILD_DIR = build
 
 # === AUTOMATIC SKETCH DIR NAME ===
@@ -23,7 +25,7 @@ upload: compile
 
 # === SERIAL MONITOR ===
 monitor:
-	arduino-cli monitor -p $(PORT) -b $(BOARD_FQBN) --baudrate $(BAUD)
+	arduino-cli monitor -p $(PORT) -b $(BOARD_FQBN) --config $(BAUD)
 
 # === CLEAN BUILD DIR ===
 clean:
