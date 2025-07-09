@@ -1,8 +1,13 @@
 import serial
 import struct
+from sys import platform
+
+port = 'dev/ttyUSB0' # if on linux
+if platform == "win32": # if on windows
+    port = "COM3"
 
 # Open serial port
-ser = serial.Serial('/dev/ttyUSB0', 115200)  # Adjust to your port
+ser = serial.Serial(port, 115200)  # Adjust to your port
 
 # Struct format: 9 floats, little-endian
 struct_format = '<9f'
@@ -30,4 +35,5 @@ try:
             print("Mag: ",  magRaw  )
             print("Temp: ",  tempRaw )
 except KeyboardInterrupt:
+    print("exit")
     exit()
