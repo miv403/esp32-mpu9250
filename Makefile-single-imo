@@ -1,0 +1,39 @@
+# === CONFIGURATION ===
+BOARD_FQBN = esp32:esp32:esp32dev
+PORT = /dev/ttyUSB0
+BAUD = 115200
+BUILD_DIR = build
+
+# === TARGET: Default fallback ===
+all:
+	@echo "Usage:"
+	@echo "  make sketchname.ino      # compile sketch"
+	@echo "  make upload SKETCH=sketchname.ino"
+	@echo "  make monitor"
+
+# === RULE: Compile arbitrary .ino files ===
+%.ino:
+	@SKETCH_DIR=$$(basename $@ .ino); \
+	mkdir -p $$SKETCH_DIR; \
+	cp $@ $$SKETCH_DIR/; \
+	arduino-cli compile --fqbn $(BOARD_FQBN) --output-dir $(BUILD_DIR) $$SKETCH_DIR
+
+# === RULE: Upload (needs SKETCH=filename.ino) ===
+upload:
+ifndef SKETCH
+	$(error Please specify SKETCH=filename.ino)
+endif
+	@SKETCH_DIR=$$(basename $(SKETCH) .ino); \
+	mkdir -p $$SKETCH_DIR; \
+	cp $(SKETCH) $$SKETCH_DIR/; \
+	arduino-cli compile --fqbn $(BOARD_FQBN) --output-dir $(BUILD_DIR) $$SKETCH_DIR; \
+	arduino-cli upload -p $(PORT) --fqbn $(BOARD_FQBN) --input-dir $(BUILD_DIR) $$SKETCH_DIR
+
+# === RULE: Monitor Serial ===
+monitor:
+	arduino-cli monitor -p $(PORT) -b $(BOARD_FQBN) --baudrate $(BAUD)
+
+# === RULE: Clean Build Directory ===
+clean:
+	rm -rf $(BUILD_DIR) *.ino.dSYM */*.ino
+

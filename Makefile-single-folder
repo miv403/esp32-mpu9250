@@ -1,0 +1,33 @@
+# === CONFIGURATION ===
+BOARD_FQBN = esp32:esp32:esp32dev
+PORT = /dev/ttyUSB0
+BAUD = 115200
+BUILD_DIR = build
+
+# === Default help ===
+all:
+	@echo "Usage examples:"
+	@echo "  make sketch_folder        # compile sketch in sketch_folder/"
+	@echo "  make upload SKETCH=dir    # compile + upload sketch"
+	@echo "  make monitor              # open serial monitor"
+
+# === Pattern rule to compile folder: make my-folder ===
+%:
+	arduino-cli compile --fqbn $(BOARD_FQBN) --output-dir $(BUILD_DIR)/$@ $@
+
+# === Upload: needs SKETCH=foldername ===
+upload:
+ifndef SKETCH
+	$(error Please specify SKETCH=foldername, e.g. make upload SKETCH=my-folder)
+endif
+	arduino-cli compile --fqbn $(BOARD_FQBN) --output-dir $(BUILD_DIR)/$(SKETCH) $(SKETCH)
+	arduino-cli upload -p $(PORT) --fqbn $(BOARD_FQBN) --input-dir $(BUILD_DIR)/$(SKETCH) $(SKETCH)
+
+# === Serial Monitor ===
+monitor:
+	arduino-cli monitor -p $(PORT) -b $(BOARD_FQBN) --baudrate $(BAUD)
+
+# === Clean build files ===
+clean:
+	rm -rf $(BUILD_DIR)
+
