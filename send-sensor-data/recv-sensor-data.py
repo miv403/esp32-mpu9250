@@ -10,7 +10,7 @@ if platform == "win32": # if on windows
 ser = serial.Serial(port, 115200)  # Adjust to your port
 
 # Struct format: 9 floats, little-endian
-struct_format = '<9f'
+struct_format = '<10f'
 struct_size = struct.calcsize(struct_format)
 try: 
     while True:

@@ -5,7 +5,8 @@ BAUD = 115200
 # SKETCH = write-serial.ino
 # SKETCH = simple-serial-comm
 # SKETCH = send-struct
-SKETCH = send-sensor-data
+# SKETCH = send-sensor-data
+SKETCH = accel-gyro-calibration
 BUILD_DIR = build
 
 # === AUTOMATIC SKETCH DIR NAME ===

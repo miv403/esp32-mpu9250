@@ -26,6 +26,9 @@ void setup() {
   Wire.begin();
   delay(2000); // Give time to open serial port
 
+  // if calibration needed
+  //    then calibrate()
+
   sensorCheck();
 }
 
@@ -60,6 +63,7 @@ void calibrate() {
     print_calibration();
     mpu.verbose(false);
 }
+
 
 void setCalibrationData() {
   calibrationData.accBiasX = mpu.getAccBiasX() * 1000.f / (float)MPU9250::CALIB_ACCEL_SENSITIVITY;
