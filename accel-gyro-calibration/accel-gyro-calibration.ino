@@ -107,6 +107,9 @@ void recvCalibrationData() {
 }
 
 void getBias() {
+
+  // FIXME aşağıdaki dönüşümler ekrana basmak için kullanlıyor. 
+  // kaydettikten sonra tekrar register'lara yüklerken gerekli olmayabilir.
   calibrationData.accBiasX = mpu.getAccBiasX() * 1000.f / (float)MPU9250::CALIB_ACCEL_SENSITIVITY;
   calibrationData.accBiasY = mpu.getAccBiasY() * 1000.f / (float)MPU9250::CALIB_ACCEL_SENSITIVITY;
   calibrationData.accBiasZ = mpu.getAccBiasZ() * 1000.f / (float)MPU9250::CALIB_ACCEL_SENSITIVITY;;
