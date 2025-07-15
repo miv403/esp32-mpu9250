@@ -6,7 +6,7 @@ BAUD = 115200
 # SKETCH = simple-serial-comm
 # SKETCH = send-struct
 # SKETCH = send-sensor-data
-SKETCH = accel-gyro-calibration
+SKETCH = serial-comm
 BUILD_DIR = build
 
 # === AUTOMATIC SKETCH DIR NAME ===
