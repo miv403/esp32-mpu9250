@@ -44,26 +44,6 @@ void loop() {
   delay(100); // 10Hz update rate
 }
 
-void calibrate() {
-
-    // calibrate anytime you want to
-    Serial.println("Accel Gyro calibration will start in 5sec.");
-    Serial.println("Please leave the device still on the flat plane.");
-    mpu.verbose(true);
-    delay(5000);
-    mpu.calibrateAccelGyro();
-
-    Serial.println("Mag calibration will start in 5sec.");
-    Serial.println("Please Wave device in a figure eight until done.");
-    delay(5000);
-    mpu.calibrateMag();
-
-    setCalibrationData();
-
-    print_calibration();
-    mpu.verbose(false);
-}
-
 
 void setCalibrationData() {
   calibrationData.accBiasX = mpu.getAccBiasX() * 1000.f / (float)MPU9250::CALIB_ACCEL_SENSITIVITY;
@@ -166,3 +146,4 @@ void sensorCheck() {
       }
   }
 }
+
