@@ -31,43 +31,41 @@ void setup() {
   Wire.begin();
   delay(2000);
 
-    if (!mpu.setup(0x68)) {  // change to your own address
-        while (1) {
-            Serial.write(RESP_ERR);
-            delay(5000);
-        }
-    }
+  if (!mpu.setup(0x68)) {  // change to your own address
+      while (1) {
+          Serial.write(RESP_ERR);
+          delay(5000);
+      }
+  }
   uint8_t cmd = 0xAA;
   while(true) {
     if (Serial.available()) {
       uint8_t cmd = Serial.read();
-      if (cmd == CMD_CALIBRATE) {
+
+      if (cmd == CMD_CALIBRATE) { // CALIBRATION
+        // Serial.write(RESP_OK);
+        calibrate();
+        Serial.write(RESP_CALIB_DONE);
+
+        sendStruct(&calib, sizeof(CalibrationData), 'A');
+
+        // Serial.write((uint8_t*)&calib, sizeof(CalibrationData));
         break;
       }
+      else if (cmd == CMD_RECV_CALIB) { // TODO didn't test it yet
+        // gets saved calibration data from serial
+        Serial.write(RESP_OK);
+
+        while (Serial.available() < sizeof(CalibrationData));
+        Serial.readBytes( (uint8_t*)&calib, sizeof(CalibrationData));
+        Serial.write(RESP_CALIB_RCVD);
+        // break;
+      }
+       // else if (cmd == CMD_GET_SENSOR) {
+       //   break;
+       // }
     }
   }
-  if (cmd == CMD_CALIBRATE) { // CALIBRATION
-    Serial.write(RESP_OK);
-    calibrate();
-    Serial.write(RESP_CALIB_DONE);
-
-    sendStruct(&calib, sizeof(CalibrationData));
-
-    // Serial.write((uint8_t*)&calib, sizeof(CalibrationData));
-    // break;
-  }
-  else if (cmd == CMD_RECV_CALIB) { // TODO didn't test it yet
-    // gets saved calibration data from serial
-    Serial.write(RESP_OK);
-
-    while (Serial.available() < sizeof(CalibrationData));
-    Serial.readBytes( (uint8_t*)&calib, sizeof(CalibrationData));
-    Serial.write(RESP_CALIB_RCVD);
-    // break;
-  }
-   // else if (cmd == CMD_GET_SENSOR) {
-   //   break;
-   // }
    // Serial.write(RESP_SENSOR_MODE);
    // setSensorData(); // gets & sets sensorData before send
    // sendStruct(&sensorData, sizeof(SensorData));
@@ -75,24 +73,26 @@ void setup() {
 
 
 void loop() {
+
+    delay(2000);
     // Serial.flush();
     // Serial.println("Before setSensorData");
     setSensorData(); // gets & sets sensorData before send
     //Serial.println("Before HEADER");
     
-    sendStruct(&sensorData, sizeof(SensorData));
+    sendStruct(&sensorData, sizeof(SensorData), 'B');
     // Serial.write((uint8_t*)&sensorData, sizeof(SensorData));
 }
 
-void sendStruct(const void* data, size_t size) {
+void sendStruct(const void* data, size_t size, char header) {
   // Start marker to indicate the beginning of a struct
-  Serial.write('S');
+  Serial.write(header);
   Serial.write('T');
   // Send the struct data as a byte array
   Serial.write((uint8_t*)data, size);
   // End marker to indicate the end of a struct
-  Serial.write('E');
-  Serial.write('D');
+  //Serial.write('E');
+  //Serial.write('D');
 }
 bool receiveStruct(void* data, size_t size) {
   // Check for the start marker
@@ -116,9 +116,9 @@ void calibrate() {
     // calibrate anytime you want to
     // Serial.println("Accel Gyro calibration will start in 5sec.");
     // Serial.println("Please leave the device still on the flat plane.");
-    mpu.verbose(true);
-    delay(200);
+    // mpu.verbose(true);
     mpu.calibrateAccelGyro();
+    Serial.write(RESP_OK);
 
     // Serial.println("Mag calibration will start in 5sec.");
     // Serial.println("Please Wave device in a figure eight until done.");
@@ -128,7 +128,7 @@ void calibrate() {
     getBias(); // saves the acquired bias to CalibrationData struct
 
     // print_calibration(); // old function to print biases to serial
-    mpu.verbose(false);
+    // mpu.verbose(false);
 }
 void getBias() {
   calib.accBias[0]  = mpu.getAccBiasX();

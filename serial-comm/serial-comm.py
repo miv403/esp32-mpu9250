@@ -1,8 +1,10 @@
+from typing import ReadOnly
 import serial
 import struct
 import time
 
-HEADER_BYTES = b'ST' # Define header bytes as bytes literal
+HEADER_BYTES = b'AT' # Define header bytes as bytes literal
+HEADER_BYTES_2 = b'BT' # Define header bytes as bytes literal
 TERM_BYTES = b'ED' # Define terminal bytes as bytes literal
 
 ser = serial.Serial("/dev/ttyUSB0", 115200, timeout=1)
@@ -30,7 +32,8 @@ calibration = {
 
 class Device:
     def __init__(self):
-        time.sleep(1.5)
+        # time.sleep(1.5)
+        pass
 
     def read_resp(self):
         resp = ser.read(1)
@@ -51,13 +54,13 @@ class Device:
         # sends command to calibration and recieves bias data
         ser.write(bytes([CMD_CALIBRATE]))
         self.read_resp()
-        time.sleep(0.3)
+        # time.sleep(3)
         self.read_resp()
 
         bias = self.receiveStruct('<6f')
 
-        if not bias:
-            print("bias data not recieved.")
+        if bias == None:
+            print("bias data not receieved.")
             return
 
         print("Bias Data: ")
@@ -85,31 +88,37 @@ class Device:
             print("sensor data not received")
             return
         print("Sensor Data: ") # debug purposes FIXME delete this line
-        print("Accel Data: %5f %5f %5f" % (sensorData[0], sensorData[1], sensorData[2]))
-        print("Gyro Data:  %5f %5f %5f" % (sensorData[3], sensorData[4], sensorData[5])) 
-        # Corrected print for gyroscope
+        print("Accel Data: %.5f %.5f %.5f" % (sensorData[0], sensorData[1], sensorData[2]))
+        print("Gyro Data:  %.5f %.5f %.5f" % (sensorData[3], sensorData[4], sensorData[5])) 
 
-
+        # print("Accel Data: ", sensorData[0:3])
+        # print("Gyro Data: ", sensorData[3:6])
 
     def receiveStruct(self,struct_format):
         struct_size = struct.calcsize(struct_format)
         try:
             while True:
-                if ser.read(2) == HEADER_BYTES:
-                    break
+                header = ser.read(2)
+                if header == HEADER_BYTES or header == HEADER_BYTES_2:
+                    print("header: ", header)
+                    data = ser.read(struct_size)
+                    unpacked_data = struct.unpack(struct_format, data)
+                    return unpacked_data
+                    # break
 
             # Look for the start marker
             # if ser.in_waiting >= 2 and ser.read(2) == HEADER_BYTES:
                 # Read the struct data
-            if ser.in_waiting >= struct_size + 2:
-                data = ser.read(struct_size)
-                end_marker = ser.read(2)
-                # Check for the end marker
-                if end_marker == TERM_BYTES:
-                    unpacked_data = struct.unpack(struct_format, data)
-                    # Decode the string from bytes
-                    # message = unpacked_data[2].strip(b'\x00').decode('utf-8')
-                    return unpacked_data
+            # if ser.in_waiting >= struct_size + 2:
+            #     data = ser.read(struct_size)
+            #     end_marker = ser.read(2)
+                  # Check for the end marker
+            #     if end_marker == TERM_BYTES:
+            #         print("terminal: ", header)
+            #         unpacked_data = struct.unpack(struct_format, data)
+                      # Decode the string from bytes
+                      # message = unpacked_data[2].strip(b'\x00').decode('utf-8')
+            #         return unpacked_data
 
         except serial.SerialException as e:
             print(f"Error reading from serial port: {e}")
@@ -127,15 +136,13 @@ def main():
     else:
 
         esp32.calibrate()
-        time.sleep(0.5)
-
-    print("Sensor Data 1") # FIXME debug purposes
+        # time.sleep(0.5)
 
     while True:
         esp32.getSensorData()
         # raw = ser.read(1024)
         # print(raw)
-        time.sleep(0.5)
+        time.sleep(1)
 
 if __name__ == "__main__":
     try: 
