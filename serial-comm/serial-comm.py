@@ -2,6 +2,9 @@ import serial
 import struct
 import time
 
+HEADER_BYTES = b'ST' # Define header bytes as bytes literal
+TERM_BYTES = b'ED' # Define terminal bytes as bytes literal
+
 ser = serial.Serial("/dev/ttyUSB0", 115200, timeout=1)
 
 CMD_CALIBRATE  = 0x01
@@ -27,7 +30,8 @@ calibration = {
 
 class Device:
     def __init__(self):
-        pass
+        time.sleep(1.5)
+
     def read_resp(self):
         resp = ser.read(1)
         # if resp:
@@ -44,67 +48,74 @@ class Device:
         ser.write(calibData_raw)
 
     def calibrate(self):
+        # sends command to calibration and recieves bias data
         ser.write(bytes([CMD_CALIBRATE]))
         self.read_resp()
         time.sleep(0.3)
-        # self.read_resp()
+        self.read_resp()
+
+        bias = self.receiveStruct('<6f')
+
+        if not bias:
+            print("bias data not recieved.")
+            return
+
+        print("Bias Data: ")
+        print("Accel Bias: ", bias[0:3])
+        print("Gyro Bias: ", bias[3:6])
 
         # Read full struct
+        # struct_format = '<6f'
+        # struct_size = struct.calcsize(struct_format)
+        # data_bytes = ser.read(struct_size)
 
-        struct_format = '<6f'
-        struct_size = struct.calcsize(struct_format)
-        data_bytes = ser.read(struct_size)
-
-        if len(data_bytes) == struct_size:
-            values = struct.unpack(struct_format, data_bytes)
-            print("Bias data")
-            print("Accel:", values[0:3],
-                  "Gyro:", values[3:6]
-                  #, "Mag:", values[6:9]
-            )
+        # if len(data_bytes) == struct_size:
+        #     values = struct.unpack(struct_format, data_bytes)
+        #     print("Bias data")
+        #     print("Accel:", values[0:3],
+        #           "Gyro:", values[3:6]
+        #           #, "Mag:", values[6:9]
+        #     )
 
     def getSensorData(self):
-        # ser.write(bytes([CMD_GET_SENSOR]))
-        # raw = ser.read(24) # 6 floats x 4 bytes
-        # if len(raw) == 24:
-        #     values = struct.unpack('<6f', raw)
-        #     return {
-        #         'acc' : values[0:3],
-        #         'gyro' : values[3:6]
-        #     }
+        # self.read_resp() # reading serial for RESP_SENSOR_MODE
+        sensorData = self.receiveStruct('<6f')
 
-        struct_format = '<6f' # acc*3 + gyro*3 = 6 floats
-                              # esp32 and amd64 is little endian
-                              # < means little endian
+        if not sensorData:
+            print("sensor data not received")
+            return
+        print("Sensor Data: ") # debug purposes FIXME delete this line
+        print("Accel Data: %5f %5f %5f" % (sensorData[0], sensorData[1], sensorData[2]))
+        print("Gyro Data:  %5f %5f %5f" % (sensorData[3], sensorData[4], sensorData[5])) 
+        # Corrected print for gyroscope
+
+
+
+    def receiveStruct(self,struct_format):
         struct_size = struct.calcsize(struct_format)
-        while True:
+        try:
+            while True:
+                if ser.read(2) == HEADER_BYTES:
+                    break
 
-            print("sensor data2")
-            # while True: # wait for header
-            #     if ser.read() == b'\xAA':
-            #         if ser.read() == b'\x55':
-            #             break
-            # Read full struct
-            raw = ser.read(struct_size)
-            if len(raw) == struct_size:
-                values = struct.unpack(struct_format, raw)
+            # Look for the start marker
+            # if ser.in_waiting >= 2 and ser.read(2) == HEADER_BYTES:
+                # Read the struct data
+            if ser.in_waiting >= struct_size + 2:
+                data = ser.read(struct_size)
+                end_marker = ser.read(2)
+                # Check for the end marker
+                if end_marker == TERM_BYTES:
+                    unpacked_data = struct.unpack(struct_format, data)
+                    # Decode the string from bytes
+                    # message = unpacked_data[2].strip(b'\x00').decode('utf-8')
+                    return unpacked_data
 
-                print("acc: %.2f %.2f %.2f" % (values[0], values[1], values[2]))
-                print("gyro: %.2f %.2f %.2f" % (values[3], values[4], values[5]))
-
-                # print("acc: ", end="")
-                # print("%.2f " % values[0:3][0], "%.2f " % values[0:3][1], "%.2f " % values[0:3][2])
-                # print("gyro: ", end="")
-                # print("%.2f " % values[3:6][0], "%.2f " % values[3:6][1], "%.2f " % values[3:6][2])
-                # print(f"acc: {format(values[0:3][0], '.5f')},{format(values[0:3][1], '.5f')},{format(values[0:3][2], '.5f')}")
-                # print(f"gyro: {format(values[3:6][0], '.5f')},{format(values[3:6][1], '.5f')},{format(values[3:6][2], '.5f')}")
-            time.sleep(0.5)
-
-        # return {
-        #     'acc' : values[0:3],
-        #     'gyro': values[3:6]
-        # }
-
+        except serial.SerialException as e:
+            print(f"Error reading from serial port: {e}")
+        except struct.error as e:
+            print(f"Error unpacking data: {e}")
+        return None
 def main():
 
     esp32 = Device()
@@ -118,15 +129,13 @@ def main():
         esp32.calibrate()
         time.sleep(0.5)
 
-    print("sensor data")
-    esp32.getSensorData()
-    #while True:
-    #    data = esp32.getSensorData()
-    #    if data:
-    #        print("Acc:", data['acc'], "Gyro:", data['gyro']
-    #              #, "Mag:", data['mag']
-    #        )
-    #    time.sleep(0.5)
+    print("Sensor Data 1") # FIXME debug purposes
+
+    while True:
+        esp32.getSensorData()
+        # raw = ser.read(1024)
+        # print(raw)
+        time.sleep(0.5)
 
 if __name__ == "__main__":
     try: 
@@ -137,3 +146,46 @@ if __name__ == "__main__":
         ser.close()
         exit()
 
+"""
+
+    def getSensorData(self):
+        pass
+        struct_format = '<6f'
+        struct_size = struct.calcsize(struct_format)
+        while True:
+                # Read until we find the header
+                while True:
+                    print("headers")
+                    byte1 = ser.read(1)
+                    if not byte1: # Timeout or no data
+                        break # Exit inner loop, try again
+                    if byte1 == HEADER_BYTES[0:1]: # Check for 0xAA
+                        byte2 = ser.read(1)
+                        if not byte2:
+                            break # Exit inner loop, try again
+                        if byte2 == HEADER_BYTES[1:2]: # Check for 0x55
+                            print("Header found!")
+                            break # Header found, break from inner while loop
+
+                # If header was found, proceed to read the struct data
+                if byte1 == HEADER_BYTES[0:1] and byte2 == HEADER_BYTES[1:2]: # Ensure header was actually found
+                    if ser.in_waiting >= struct_size:
+                        raw_data = ser.read(struct_size)
+                        if len(raw_data) == struct_size:
+                            try:
+                                values = struct.unpack(struct_format, raw_data)
+                                print("acc: %.2f %.2f %.2f" % (values[0], values[1], values[2]))
+                                print("gyro: %.2f %.2f %.2f" % (values[3], values[4], values[5])) # Corrected print for gyroscope
+                            except struct.error as e:
+                                print(f"Error unpacking data: {e}. Raw: {raw_data.hex()}")
+                        else:
+                            print(f"Incomplete data received. Expected {struct_size}, got {len(raw_data)}")
+                    else:
+                        # Not enough data after header, might need to re-sync
+                        print("Not enough data immediately after header. Resyncing...")
+                else:
+                    # If we broke out of the inner loop without finding a header
+                    pass # Just continue the outer loop to keep searching for headers
+
+                time.sleep(0.01) # Small delay to prevent busy-waiting and allow buffer to fill
+"""
