@@ -53,8 +53,9 @@ class Device:
     def calibrate(self):
         # sends command to calibration and recieves bias data
         ser.write(bytes([CMD_CALIBRATE]))
+        time.sleep(0.1)
         self.read_resp()
-        # time.sleep(3)
+        time.sleep(0.4)
         self.read_resp()
 
         bias = self.receiveStruct('<6f')
@@ -106,20 +107,6 @@ class Device:
                     return unpacked_data
                     # break
 
-            # Look for the start marker
-            # if ser.in_waiting >= 2 and ser.read(2) == HEADER_BYTES:
-                # Read the struct data
-            # if ser.in_waiting >= struct_size + 2:
-            #     data = ser.read(struct_size)
-            #     end_marker = ser.read(2)
-                  # Check for the end marker
-            #     if end_marker == TERM_BYTES:
-            #         print("terminal: ", header)
-            #         unpacked_data = struct.unpack(struct_format, data)
-                      # Decode the string from bytes
-                      # message = unpacked_data[2].strip(b'\x00').decode('utf-8')
-            #         return unpacked_data
-
         except serial.SerialException as e:
             print(f"Error reading from serial port: {e}")
         except struct.error as e:
@@ -134,15 +121,10 @@ def main():
     if use_existing_calib:
         esp32.sendCalibration(calibration)
     else:
-
         esp32.calibrate()
-        # time.sleep(0.5)
 
     while True:
         esp32.getSensorData()
-        # raw = ser.read(1024)
-        # print(raw)
-        time.sleep(1)
 
 if __name__ == "__main__":
     try: 
@@ -154,7 +136,6 @@ if __name__ == "__main__":
         exit()
 
 """
-
     def getSensorData(self):
         pass
         struct_format = '<6f'

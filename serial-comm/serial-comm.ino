@@ -27,20 +27,21 @@ struct SensorData {
 
 void setup() {
   Serial.begin(115200);
-  Serial.flush();
   Wire.begin();
   delay(2000);
 
+  // sensor check
   if (!mpu.setup(0x68)) {  // change to your own address
       while (1) {
           Serial.write(RESP_ERR);
           delay(5000);
       }
   }
+
   uint8_t cmd = 0xAA;
   while(true) {
     if (Serial.available()) {
-      uint8_t cmd = Serial.read();
+      cmd = Serial.read();
 
       if (cmd == CMD_CALIBRATE) { // CALIBRATION
         // Serial.write(RESP_OK);
@@ -61,27 +62,25 @@ void setup() {
         Serial.write(RESP_CALIB_RCVD);
         // break;
       }
-       // else if (cmd == CMD_GET_SENSOR) {
-       //   break;
-       // }
+      else if (cmd == CMD_GET_SENSOR) {
+        break;
+      }
     }
   }
-   // Serial.write(RESP_SENSOR_MODE);
-   // setSensorData(); // gets & sets sensorData before send
-   // sendStruct(&sensorData, sizeof(SensorData));
 }
 
 
 void loop() {
 
-    delay(2000);
-    // Serial.flush();
-    // Serial.println("Before setSensorData");
-    setSensorData(); // gets & sets sensorData before send
-    //Serial.println("Before HEADER");
-    
-    sendStruct(&sensorData, sizeof(SensorData), 'B');
-    // Serial.write((uint8_t*)&sensorData, sizeof(SensorData));
+  if (mpu.update()) {
+    static uint32_t prev_ms = millis();
+    if (millis() > prev_ms + 25) {
+      setSensorData(); // gets & sets sensorData before send
+      sendStruct(&sensorData, sizeof(SensorData), 'B');
+      prev_ms = millis();
+    }
+  }
+  delay(100); // 10Hz update rate
 }
 
 void sendStruct(const void* data, size_t size, char header) {
@@ -151,6 +150,7 @@ void setBias() { // sets mpu9250's offset registers
 
 void setSensorData() {
     // the current sensor data should be packaged before transmission
+    // mpu.update();
 
     sensorData.acc[0] = mpu.getAccX();
     sensorData.acc[1] = mpu.getAccY();
