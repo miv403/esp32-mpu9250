@@ -1,7 +1,9 @@
-from typing import ReadOnly
 import serial
 import struct
 import time
+import pickle
+
+CALIB_FILE = "./calib.dat"
 
 HEADER_BYTES = b'AT' # Define header bytes as bytes literal
 HEADER_BYTES_2 = b'BT' # Define header bytes as bytes literal
@@ -33,7 +35,19 @@ calibration = {
 class Device:
     def __init__(self):
         # time.sleep(1.5)
+        self.bias = ()
+        self.readBiasFromFile()
         pass
+
+    def saveBias(self):
+        calibDataFile = open(CALIB_FILE, "wb")
+        pickle.dump(self.bias, calibDataFile)
+        calibDataFile.close()
+
+    def readBiasFromFile(self):
+        calibDataFile = open(CALIB_FILE, "rb")
+        self.bias = pickle.load(calibDataFile)
+        print("Bias data read: ", self.bias)
 
     def read_resp(self):
         resp = ser.read(1)
@@ -43,30 +57,25 @@ class Device:
 
         print("[ESP32] Response: ", resp)
 
-    def sendCalibration(self, data):
-        struct_format = '<6f'
-        calibData_raw = struct.pack(struct_format,
-                                    *(data['accBias'] + data['gyroBias']))
-        ser.write(bytes([CMD_SEND_CALIB]))
-        ser.write(calibData_raw)
-
     def calibrate(self):
         # sends command to calibration and recieves bias data
         ser.write(bytes([CMD_CALIBRATE]))
-        time.sleep(0.1)
+        time.sleep(0.4)
         self.read_resp()
         time.sleep(0.4)
         self.read_resp()
 
-        bias = self.receiveStruct('<6f')
+        self.bias = self.receiveStruct('<6f')
 
-        if bias == None:
+        if self.bias == None:
             print("bias data not receieved.")
             return
-
+        print(self.bias)
         print("Bias Data: ")
-        print("Accel Bias: ", bias[0:3])
-        print("Gyro Bias: ", bias[3:6])
+        print("Accel Bias: ", self.bias[0:3])
+        print("Gyro Bias: ",  self.bias[3:6])
+
+        self.saveBias()
 
         # Read full struct
         # struct_format = '<6f'
@@ -95,36 +104,65 @@ class Device:
         # print("Accel Data: ", sensorData[0:3])
         # print("Gyro Data: ", sensorData[3:6])
 
+    def sendCalibration(self):
+        struct_format = '<6f'
+        ser.write(bytes([CMD_SEND_CALIB]))
+        self.read_resp()
+        self.sendStruct(self.bias, struct_format)
+        self.read_resp()
+        # calibData_raw = struct.pack(struct_format, *(data['accBias'] + data['gyroBias']))
+        # ser.write(calibData_raw)
+
     def receiveStruct(self,struct_format):
         struct_size = struct.calcsize(struct_format)
         try:
             while True:
+                print("waiting for header")
                 header = ser.read(2)
                 if header == HEADER_BYTES or header == HEADER_BYTES_2:
                     print("header: ", header)
                     data = ser.read(struct_size)
                     unpacked_data = struct.unpack(struct_format, data)
                     return unpacked_data
-                    # break
 
         except serial.SerialException as e:
             print(f"Error reading from serial port: {e}")
         except struct.error as e:
             print(f"Error unpacking data: {e}")
         return None
+
+    def sendStruct(self, data, struct_format):
+        # Args:
+        #     data: A tuple containing the data to be sent.
+        try:
+            packed_data = struct.pack(struct_format, *data)
+            ser.write(b'ST' + packed_data + b'ED')
+            print(f"Sent: {data}")
+        except serial.SerialException as e:
+            print(f"Error writing to serial port: {e}")
 def main():
 
     esp32 = Device()
 
-    use_existing_calib = False
-
-    if use_existing_calib:
-        esp32.sendCalibration(calibration)
-    else:
-        esp32.calibrate()
+    # esp32.calibrate()
+    esp32.sendCalibration()
 
     while True:
         esp32.getSensorData()
+
+    # while True:
+    #     print("MPU9250 Controller: ")
+    #     print("1. Calibrate")
+    #     print("2. Send Calibration")
+    #     print("3. Get Sensor Data")
+    #     cmd = input("?: ")
+    #     if cmd == "1":
+    #         esp32.calibrate()
+    #     elif cmd == "2":
+    #         esp32.sendCalibration()
+    #     elif cmd == "3":
+    #         while True:
+    #             esp32.getSensorData()
 
 if __name__ == "__main__":
     try: 

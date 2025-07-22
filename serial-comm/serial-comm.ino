@@ -29,6 +29,7 @@ void setup() {
   Serial.begin(115200);
   Wire.begin();
   delay(2000);
+  Serial.setTimeout(1);
 
   // sensor check
   if (!mpu.setup(0x68)) {  // change to your own address
@@ -41,7 +42,8 @@ void setup() {
   uint8_t cmd = 0xAA;
   while(true) {
     if (Serial.available()) {
-      cmd = Serial.read();
+      // cmd = Serial.read();
+      Serial.readBytes((uint8_t*)&cmd, sizeof(uint8_t));
 
       if (cmd == CMD_CALIBRATE) { // CALIBRATION
         // Serial.write(RESP_OK);
@@ -57,21 +59,25 @@ void setup() {
         // gets saved calibration data from serial
         Serial.write(RESP_OK);
 
-        while (Serial.available() < sizeof(CalibrationData));
-        Serial.readBytes( (uint8_t*)&calib, sizeof(CalibrationData));
-        Serial.write(RESP_CALIB_RCVD);
-        // break;
+        // while (Serial.available() < sizeof(CalibrationData));
+        // Serial.readBytes( (uint8_t*)&calib, sizeof(CalibrationData));
+        // Serial.write(RESP_CALIB_RCVD);
+
+        if (receiveStruct(&calib, sizeof(CalibrationData))) {
+          Serial.write(RESP_CALIB_RCVD);
+        }
+        setBias();
+        break;
       }
       else if (cmd == CMD_GET_SENSOR) {
+        Serial.write(RESP_SENSOR_MODE);
         break;
       }
     }
   }
 }
 
-
 void loop() {
-
   if (mpu.update()) {
     static uint32_t prev_ms = millis();
     if (millis() > prev_ms + 25) {
@@ -117,6 +123,7 @@ void calibrate() {
     // Serial.println("Please leave the device still on the flat plane.");
     // mpu.verbose(true);
     mpu.calibrateAccelGyro();
+    delay(10);
     Serial.write(RESP_OK);
 
     // Serial.println("Mag calibration will start in 5sec.");
