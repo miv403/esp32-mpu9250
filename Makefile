@@ -8,7 +8,8 @@ BAUD = 115200
 # SKETCH = simple-serial-comm
 # SKETCH = send-struct
 # SKETCH = send-sensor-data
-SKETCH = serial-comm
+# SKETCH = serial-comm
+SKETCH = main
 BUILD_DIR = build
 
 # === AUTOMATIC SKETCH DIR NAME ===

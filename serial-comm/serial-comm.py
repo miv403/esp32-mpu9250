@@ -50,7 +50,7 @@ class Device:
         print("Bias data read: ", self.bias)
 
     def read_resp(self):
-        resp = ser.read(1)
+        resp = ser.read(2)
         # if resp:
         #     code = resp[0]
         #     print("[ESP32] Response:", RESP.get(code, f"Unknown ({code:#x})"))
@@ -116,8 +116,10 @@ class Device:
     def receiveStruct(self,struct_format):
         struct_size = struct.calcsize(struct_format)
         try:
+            c = 0
             while True:
-                print("waiting for header")
+                print("waiting for header ", c)
+                c += 1
                 header = ser.read(2)
                 if header == HEADER_BYTES or header == HEADER_BYTES_2:
                     print("header: ", header)
