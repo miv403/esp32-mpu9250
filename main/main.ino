@@ -11,11 +11,17 @@ MPU9250 mpu;
 #define CMD_SEND_FILTERED  'F' // F: Filtrelenmiş veri gönderimi
 #define CMD_SAVE_BIAS      'S' // S: Kayıtlı kalibrasyonu kaydet
 
+#define CALIB_DONE "CALIBRATION::DONE"
+#define CALIB_DATA "CALIBRATION::DATA"
+
 struct Bias{
-  float acc [3];
+  float acc[3];
   float gyro[3];
-  float mag [3];
+  float magBias[3];
+  float magScale[3];
 }bias;
+
+bool isCalibrated = false;
 
 void setup() {
   Serial.begin(115200);
@@ -34,15 +40,21 @@ void setup() {
       if (mpu.setup(0x68)) break;
     }
   }
+  delay(500);
   Serial.println("[ESP32] MPU9250 connected.");
 
+  char cmd = '0';
   while(true){
+    if(isCalibrated) {
+      Serial.println(CALIB_DONE);
+      // cmd = '0';
+    }
     if(Serial.available() > 0) {
-      char cmd = Serial.read();
-      
+      cmd = Serial.read();
+
       if(cmd == CMD_CALIBRATE_ACCL
       || cmd == CMD_CALIBRATE_GYRO
-      || cmd == CMD_CALIBRATE_MAGN) {
+      || cmd == CMD_CALIBRATE_MAGN) { // TODO test calibration
         startCalibration(cmd);
       }
       else if(cmd == CMD_SEND_RAW) {
@@ -53,7 +65,6 @@ void setup() {
       }
     }
   }
-
   Serial.println("accX,accY,accZ,gyroX,gyroY,gyroZ,magX,magY,magZ");
 } // end setup()
 
@@ -65,19 +76,6 @@ void loop() {
       prev_ms = millis();
     }
   }
-}
-
-void startCalibration(char type) {
-
-      // if(type == CMD_CALIBRATE_ACCL){
-
-      // }
-      // else if (type == CMD_CALIBRATE_GYRO){
-
-      // }
-      // else if (type == CMD_CALIBRATE_MAGN){
-
-      // }
 }
 
 void sendRawData() {
@@ -93,31 +91,29 @@ void sendRawData() {
   Serial.println(mpu.getMagZ());
 }
 
-void saveBias() {
-  char *title = "accX,accY,accZ,gyroX,gyroY,gyroZ,magX,magY,magZ\n";
-  if (Serial.available() > 0) {
-    String input = Serial.readStringUntil('\n');  // Read until newline
-    String csv_str = title + input;
-    CSV_Parser cp(csv_str, /*format*/ "fffffffff"); // 9 float
+void startCalibration(char type) {
 
-    float *floats = (float*)cp["my_floats"];
-    bias.acc[0]  = (float*)cp["accX"][0];
-    bias.acc[1]  = (float*)cp["accY"][1];
-    bias.acc[2]  = (float*)cp["accZ"][2];
-
-    bias.gyro[0] = (float*)cp["gyroX"][0];
-    bias.gyro[1] = (float*)cp["gyroY"][1];
-    bias.gyro[2] = (float*)cp["gyroZ"][2];
-
-    bias.mag[0]  = (float*)cp["magX"][0];
-    bias.mag[1]  = (float*)cp["magY"][1];
-    bias.mag[2]  = (float*)cp["magZ"][2];
-
-    setBias();
-    //Serial.print("You entered: ");
-    // Serial.println(csv_str);
+  if(type == CMD_CALIBRATE_ACCL || type == CMD_CALIBRATE_GYRO){
+    // calibrate anytime you want to
+    Serial.println("Accel Gyro calibration will start in 1sec.");
+    Serial.println("Please leave the device still on the flat plane.");
+    delay(1000);
+    mpu.calibrateAccelGyro();
+    // print_calibration();
+    sendBias(type);
 
   }
+  else if(type == CMD_CALIBRATE_MAGN){
+    mpu.verbose(true);
+    Serial.println("Mag calibration will start in 5sec.");
+    Serial.println("Please Wave device in a figure eight until done.");
+    delay(5000);
+    mpu.calibrateMag();
+    // print_calibration();
+    mpu.verbose(false);
+    sendBias(type);
+  }
+  isCalibrated = true;
 }
 
 void setBias() {
@@ -129,7 +125,95 @@ void setBias() {
                   bias.gyro[1],
                   bias.gyro[2]);
 
-  mpu.setMagBias (bias.mag[0],
-                  bias.mag[1],
-                  bias.mag[2]);
+  mpu.setMagBias (bias.magBias[0],
+                  bias.magBias[1],
+                  bias.magBias[2]);
+  mpu.setMagBias (bias.magScale[0],
+                  bias.magScale[1],
+                  bias.magScale[2]);
+
+  isCalibrated = true;
 }
+
+void getBias() {
+  bias.acc[0]      = mpu.getAccBiasX();
+  bias.acc[1]      = mpu.getAccBiasY();
+  bias.acc[2]      = mpu.getAccBiasZ();
+              
+  bias.gyro[0]     = mpu.getGyroBiasX();
+  bias.gyro[1]     = mpu.getGyroBiasY();
+  bias.gyro[2]     = mpu.getGyroBiasZ();
+
+  bias.magBias[0]  = mpu.getMagBiasX();
+  bias.magBias[1]  = mpu.getMagBiasY();
+  bias.magBias[2]  = mpu.getMagBiasZ();
+
+  bias.magScale[0] = mpu.getMagScaleX();
+  bias.magScale[1] = mpu.getMagScaleY();
+  bias.magScale[2] = mpu.getMagScaleZ();
+}
+
+void sendBias(char type) {
+
+  getBias();
+  Serial.println(CALIB_DATA);
+
+  if(type == CMD_CALIBRATE_ACCL || type == CMD_CALIBRATE_GYRO) {
+    Serial.println("accX,accY,accZ,gyroX,gyroY,gyroZ");
+    Serial.print(   bias.acc[0]   ); Serial.print(",");
+    Serial.print(   bias.acc[1]   ); Serial.print(",");
+    Serial.print(   bias.acc[2]   ); Serial.print(",");
+
+    Serial.print(   bias.gyro[0]  ); Serial.print(",");
+    Serial.print(   bias.gyro[1]  ); Serial.print(",");
+    Serial.println( bias.gyro[2]  );
+
+  }
+  else if(type == CMD_CALIBRATE_MAGN) {
+    Serial.println("magBiasX,magBiasY,magBiasZ,magScaleX,magScaleY,magScaleZ");
+    Serial.print( bias.magBias[0] ); Serial.print(",");
+    Serial.print( bias.magBias[1] ); Serial.print(",");
+    Serial.print( bias.magBias[2] ); Serial.print(",");
+
+    Serial.print( bias.magScale[0]); Serial.print(",");
+    Serial.print( bias.magScale[1]); Serial.print(",");
+    Serial.println( bias.magScale[2]); 
+  }
+}
+
+void saveBias() { // DONE test saving bias
+  if (Serial.available() > 0) {
+    String input = Serial.readStringUntil('\n');  // Read until newline
+
+    char *title = "accX,accY,accZ,gyroX,gyroY,gyroZ,magBiasX,magBiasY,magBiasZ,magScaleX,magScaleY,magScaleZ\n";
+    // String csv_str = title + input;
+    CSV_Parser cp(title, /*format*/ "ffffffffffff"); // 12 float
+    cp << input;
+
+    float *floats = (float*)cp["my_floats"];
+    bias.acc[0]       = ((float*)cp["accX"])[0];
+    bias.acc[1]       = ((float*)cp["accY"])[1];
+    bias.acc[2]       = ((float*)cp["accZ"])[2];
+
+    bias.gyro[0]      = ((float*)cp["gyroX"])[0];
+    bias.gyro[1]      = ((float*)cp["gyroY"])[1];
+    bias.gyro[2]      = ((float*)cp["gyroZ"])[2];
+
+    bias.magBias[0]   = ((float*)cp["magBiasX"])[0];
+    bias.magBias[1]   = ((float*)cp["magBiasY"])[1];
+    bias.magBias[2]   = ((float*)cp["magBiasZ"])[2];
+
+    bias.magScale[0]  = ((float*)cp["magScaleX"])[0];
+    bias.magScale[1]  = ((float*)cp["magScaleY"])[1];
+    bias.magScale[2]  = ((float*)cp["magScaleZ"])[2];
+
+    setBias();
+
+    Serial.print("You entered: ");
+    Serial.print(mpu.getAccBiasX());
+    Serial.print(",")
+    Serial.println(mpu.getMagScaleZ());
+
+  }
+}
+
