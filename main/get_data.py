@@ -16,6 +16,7 @@ CMD_SAVE_BIAS      = b'S' # S: Kayıtlı kalibrasyonu kaydet
 
 CALIB_DONE         = "CALIBRATION::DONE"
 CALIB_DATA         = "CALIBRATION::DATA"
+SENSOR_DATA        = "SENSOR::DATA"
 
 ACCEL_GYRO_FILE    = "accel_gyro_bias.json"
 MAG_BIAS_SCALE_FILE= "mag_bias_scale.json"
@@ -104,9 +105,7 @@ class Device:
         self._sendCommand(CMD_SAVE_BIAS)
         data = self._getBias()
         self._writeLine(data)
-        sleep(0.05)
         print(self._readline())
-
         output = self._readline()
         print(output)
         while output != CALIB_DONE:
@@ -115,15 +114,15 @@ class Device:
                 print("continue")
                 continue
             print(output)
-        self.readRaw()
-
+        # self.readRaw()
+        self.readRPY()
 
     def _getBias(self):
         accelGyroJson = open(ACCEL_GYRO_FILE, "r")
         magJson = open(MAG_BIAS_SCALE_FILE, "r")
         accelGyroDict = json.load(accelGyroJson)
         magDict = json.load(magJson)
-        
+
         accelBias = accelGyroDict['accelBias']
         gyroBias  = accelGyroDict['gyroBias']
         magBias   = magDict['magBias']
@@ -133,10 +132,10 @@ class Device:
         biasArray = np.array(biasList)
         biasData = np.array2string(biasArray, separator=',',
                                    max_line_width=100)[1:-1].replace(' ', '')
-        
         return biasData
+
     def readRaw(self):
-        self._sendCommand(CMD_SEND_RAW);
+        self._sendCommand(CMD_SEND_RAW)
         sleep(0.05)
         output = self._readline()
         print(output)
@@ -145,6 +144,19 @@ class Device:
             if output == "" or output == None:
                 continue
             print(output)
+
+    def readRPY(self):
+        self._sendCommand(CMD_SEND_FILTERED)
+        sleep(0.05)
+        output = self._readline()
+        print(output)
+        while(True):
+            output = self._readline()
+            if output == "" or output == None:
+                print("continue rpy")
+                continue
+            print(output)
+
 
 def main():
     esp32 = Device()
