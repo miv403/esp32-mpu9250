@@ -13,6 +13,7 @@ MPU9250 mpu;
 
 #define CALIB_DONE "CALIBRATION::DONE"
 #define CALIB_DATA "CALIBRATION::DATA"
+#define SENSOR_DATA "SENSOR::DATA"
 
 struct Bias{
   float acc[3];
@@ -47,7 +48,7 @@ void setup() {
   while(true){
     if(isCalibrated) {
       Serial.println(CALIB_DONE);
-      // cmd = '0';
+      cmd = '0';
     }
     if(Serial.available() > 0) {
       cmd = Serial.read();
@@ -58,21 +59,26 @@ void setup() {
         startCalibration(cmd);
       }
       else if(cmd == CMD_SEND_RAW) {
-        break;
+        Serial.println("accX,accY,accZ,gyroX,gyroY,gyroZ,magX,magY,magZ");
+        sendRawDataLoop();
       }
       else if(cmd == CMD_SAVE_BIAS) {
         saveBias();
       }
+      else if(cmd == CMD_SEND_FILTERED) {
+        Serial.println(SENSOR_DATA);
+        Serial.println("roll,pitch,yaw");
+        break;
+      }
     }
   }
-  Serial.println("accX,accY,accZ,gyroX,gyroY,gyroZ,magX,magY,magZ");
 } // end setup()
 
 void loop() {
   if(mpu.update()) {
     static uint32_t prev_ms = millis();
     if(millis() > prev_ms + 25) {
-      sendRawData();
+      sendRPY();
       prev_ms = millis();
     }
   }
@@ -89,6 +95,16 @@ void sendRawData() {
   Serial.print(mpu.getMagX()) ; Serial.print(",");
   Serial.print(mpu.getMagY()) ; Serial.print(",");
   Serial.println(mpu.getMagZ());
+}
+
+void sendRawDataLoop() {
+  if(mpu.update()) {
+    static uint32_t prev_ms = millis();
+    if(millis() > prev_ms + 25) {
+      sendRawData();
+      prev_ms = millis();
+    }
+  }
 }
 
 void startCalibration(char type) {
@@ -139,7 +155,7 @@ void getBias() {
   bias.acc[0]      = mpu.getAccBiasX();
   bias.acc[1]      = mpu.getAccBiasY();
   bias.acc[2]      = mpu.getAccBiasZ();
-              
+
   bias.gyro[0]     = mpu.getGyroBiasX();
   bias.gyro[1]     = mpu.getGyroBiasY();
   bias.gyro[2]     = mpu.getGyroBiasZ();
@@ -211,9 +227,14 @@ void saveBias() { // DONE test saving bias
 
     Serial.print("You entered: ");
     Serial.print(mpu.getAccBiasX());
-    Serial.print(",")
+    Serial.print(",");
     Serial.println(mpu.getMagScaleZ());
 
   }
 }
 
+void sendRPY() {
+  Serial.print(mpu.getRoll() - 31.31); Serial.print(",");
+  Serial.print(mpu.getPitch()); Serial.print(",");
+  Serial.println(mpu.getYaw());
+}
