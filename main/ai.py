@@ -24,7 +24,7 @@ GRAY = (180, 180, 180)
 
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
-pygame.display.set_caption('Mission Planner HUD')
+pygame.display.set_caption('Attitude indicator')
 font = pygame.font.SysFont('Arial', 18)
 font_small = pygame.font.SysFont('Arial', 14)
 
@@ -49,7 +49,7 @@ class StdoutCatcher:
 def draw_horizon(surface, roll, pitch):
     roll = -roll  # Reverse roll for correct direction
 
-    pitch_offset = pitch * 3
+    pitch_offset =  pitch * 3
     H = WIDTH * 2  # or HEIGHT * 2, just make sure it's big enough
     W = HEIGHT * 2
 
@@ -70,7 +70,7 @@ def draw_horizon(surface, roll, pitch):
     # pygame.draw.rect(surface, SKY, (0, 0, WIDTH, CENTER_Y + pitch_offset))
     # Draw ground
     # pygame.draw.rect(surface, GROUND, (0, CENTER_Y + pitch_offset, WIDTH, HEIGHT - (CENTER_Y + pitch_offset)))
-    
+
     # Draw roll line
     # horizon_y = CENTER_Y + pitch_offset
     # horizon_y = CENTER_Y
@@ -151,6 +151,7 @@ def draw_roll_scale(surface, roll):
 
 def draw_compass(surface, yaw):
     # Compass in right bottom corner, use yaw directly
+    yaw -= 180
     radius = 30
     margin = 65
     cx = WIDTH - radius - margin 
@@ -176,7 +177,9 @@ def draw_compass(surface, yaw):
     ry = cy - (radius - head_len) * math.cos(right)
     pygame.draw.polygon(surface, RED, [(ax, ay), (lx, ly), (rx, ry)])
 
-def draw_overlays(surface, roll, pitch, yaw, serial_error, last_data_time):
+def draw_overlays(surface, roll, pitch, yaw,
+                  accel, gyro, mag, temp,
+                  serial_error, last_data_time):
     pygame.draw.rect(surface, BLACK, (0, 0, WIDTH, 30))
     pygame.draw.rect(surface, BLACK, (0, HEIGHT - 30, WIDTH, 30))
     # compass = font.render('330   345   0   15   30', True, WHITE)
@@ -187,9 +190,26 @@ def draw_overlays(surface, roll, pitch, yaw, serial_error, last_data_time):
     # gps = font_small.render('GPS: 3D Fix', True, WHITE)
     # surface.blit(bat, (10, HEIGHT - 25))
     # surface.blit(gps, (WIDTH - gps.get_width() - 10, HEIGHT - 25))
-    ypr = font_small.render(f'Roll: {roll:.1f}  Pitch: {pitch:.1f}  Yaw: {yaw:.1f}', True, WHITE)
-    surface.blit(ypr, (10, HEIGHT - 35))
+    rpy = font_small.render(f'Roll: {roll:.1f}  Pitch: {pitch:.1f}  Yaw: {yaw:.1f}', True, WHITE)
+    surface.blit(rpy, (10, HEIGHT - 55))
+
     now = time.time()
+
+    accelstr = f"Accel : {accel[0]:.1f}, {accel[1]:.1f}, {accel[2]:.1f}"
+    gyrostr  = f"Gyro  : {gyro[0]:.1f}, {gyro[1]:.1f}, {gyro[2]:.1f}"
+    magstr   = f"Mag  : {mag[0]:.1f}, {mag[1]:.1f}, {mag[2]:.1f}"
+    tempstr  = f"Temp : {temp:.1f}"
+
+    accel_render = font_small.render(accelstr , True, WHITE)
+    gyro_render  = font_small.render(gyrostr  , True, WHITE)
+    mag_render   = font_small.render(magstr   , True, WHITE)
+    temp_render  = font_small.render(tempstr  , True, WHITE)
+
+    surface.blit(accel_render, (WIDTH - 180, HEIGHT - 220))
+    surface.blit(gyro_render , (WIDTH - 180, HEIGHT - 205))
+    surface.blit(mag_render  , (WIDTH - 180, HEIGHT - 190))
+    surface.blit(temp_render , (WIDTH - 180, HEIGHT - 175))
+
     if serial_error:
         err = font.render(f'Serial error: {serial_error}', True, RED)
         surface.blit(err, (CENTER_X - err.get_width() // 2, HEIGHT // 2))
@@ -322,14 +342,24 @@ def draw_compass_strip(surface, yaw, margin=30, strip_width=500, strip_height=36
         (tri_x - tri_w // 2, tri_y - tri_h),
         (tri_x + tri_w // 2, tri_y - tri_h)
     ])
-
+# roll,pitch,yaw,accX,accY,accZ,gyroX,gyroY,gyroZ,magX,magY,magZ,temp
 def main():
-    global roll, pitch, yaw, last_data_time, serial_error
+    # global roll, pitch, yaw, last_data_time, serial_error
+    # global rpy, accel, gyro, mag, temp,
+    last_data_time = 0
+    serial_error = 0
+    rpy   = [0.0, 0.0, 0.0]
+    accel = [0.0, 0.0, 0.0]
+    gyro  = [0.0, 0.0, 0.0]
+    mag   = [0.0, 0.0, 0.0]
+    temp = 0
+
     clock = pygame.time.Clock()
     data_q = queue.Queue()
     error_q = queue.Queue()
     t = threading.Thread(target=data_reader_thread, args=(data_q, error_q), daemon=True)
     t.start()
+
     running = True
     while running:
         for event in pygame.event.get():
@@ -342,9 +372,14 @@ def main():
                 line = line.strip()
                 if line and (',' in line):
                     parts = line.split(',')
-                    if len(parts) == 3:
+                    # if len(parts) == 3:
+                    if len(parts) == 13:
                         try:
-                            roll, pitch, yaw = map(float, parts)
+                            rpy[0],   rpy[1],   rpy[2]   = map(float, parts[0:3])
+                            accel[0], accel[1], accel[2] = map(float, parts[3:6])
+                            gyro[0],  gyro[1],  gyro[2]  = map(float, parts[6:9])
+                            mag[0],   mag[1],   mag[2]   = map(float, parts[9:12])
+                            temp                         = float(     parts[12])
                             last_data_time = time.time()
                         except ValueError:
                             pass
@@ -356,13 +391,16 @@ def main():
         except queue.Empty:
             pass
         screen.fill(BLACK)
-        draw_horizon(screen, roll, pitch)
-        draw_pitch_ruler(screen, roll, pitch)
-        draw_roll_arc(screen, roll)
-        # draw_roll_scale(screen, roll)
-        draw_compass(screen, yaw)
-        draw_compass_strip(screen, yaw)
-        draw_overlays(screen, roll, pitch, yaw, serial_error, last_data_time)
+        # FIXME fix all rpy parameters
+        draw_horizon      (screen, rpy[0], rpy[1])
+        draw_pitch_ruler  (screen, rpy[0], rpy[1])
+        draw_roll_arc     (screen, rpy[0])
+        # draw_roll_scale (screen, rpy[0])
+        draw_compass      (screen, rpy[2])
+        draw_compass_strip(screen, rpy[2])
+        draw_overlays     (screen, rpy[0], rpy[1], rpy[2],
+                           accel, gyro, mag, temp,
+                           serial_error, last_data_time)
         pygame.display.flip() # swaps the display buffer
         clock.tick(60)
     pygame.quit()
