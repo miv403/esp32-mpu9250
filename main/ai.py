@@ -5,7 +5,7 @@ import time
 import threading
 import queue
 # import io
-from get_data import Device
+from device import Device
 
 # Screen dimensions
 WIDTH, HEIGHT = 800, 600
