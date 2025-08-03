@@ -10,9 +10,10 @@ MPU9250 mpu;
 #define CMD_SEND_RAW       'R' // R: Ham veri gönderimi
 #define CMD_SEND_FILTERED  'F' // F: Filtrelenmiş veri gönderimi
 #define CMD_SAVE_BIAS      'S' // S: Kayıtlı kalibrasyonu kaydet
+#define CMD_SEND_ALL       'L' // L: Tüm sensör verileri + RPY
 
-#define CALIB_DONE "CALIBRATION::DONE"
-#define CALIB_DATA "CALIBRATION::DATA"
+#define CALIB_DONE  "CALIBRATION::DONE"
+#define CALIB_DATA  "CALIBRATION::DATA"
 #define SENSOR_DATA "SENSOR::DATA"
 
 struct Bias{
@@ -48,7 +49,8 @@ void setup() {
   while(true){
     if(isCalibrated) {
       Serial.println(CALIB_DONE);
-      cmd = '0';
+      // cmd = '0';
+      // isCalibrated = false;
     }
     if(Serial.available() > 0) {
       cmd = Serial.read();
@@ -68,6 +70,11 @@ void setup() {
       else if(cmd == CMD_SEND_FILTERED) {
         Serial.println(SENSOR_DATA);
         Serial.println("roll,pitch,yaw");
+        // break;
+      }
+      else if(cmd == CMD_SEND_ALL) {
+        Serial.println("roll,pitch,yaw,accX,accY,accZ,gyroX,gyroY,gyroZ,magX,magY,magZ,temp");
+        // sendAllLoop();
         break;
       }
     }
@@ -78,30 +85,8 @@ void loop() {
   if(mpu.update()) {
     static uint32_t prev_ms = millis();
     if(millis() > prev_ms + 25) {
-      sendRPY();
-      prev_ms = millis();
-    }
-  }
-}
-
-void sendRawData() {
-  // Serial.println("accX,accY,accZ,gyroX,gyroY,gyroZ,magX,magY,magZ");
-  Serial.print(mpu.getAccX()) ; Serial.print(",");
-  Serial.print(mpu.getAccY()) ; Serial.print(",");
-  Serial.print(mpu.getAccZ()) ; Serial.print(",");
-  Serial.print(mpu.getGyroX()); Serial.print(",");
-  Serial.print(mpu.getGyroY()); Serial.print(",");
-  Serial.print(mpu.getGyroZ()); Serial.print(",");
-  Serial.print(mpu.getMagX()) ; Serial.print(",");
-  Serial.print(mpu.getMagY()) ; Serial.print(",");
-  Serial.println(mpu.getMagZ());
-}
-
-void sendRawDataLoop() {
-  if(mpu.update()) {
-    static uint32_t prev_ms = millis();
-    if(millis() > prev_ms + 25) {
-      sendRawData();
+      sendAll();
+      // sendRPY();
       prev_ms = millis();
     }
   }
@@ -233,8 +218,61 @@ void saveBias() { // DONE test saving bias
   }
 }
 
-void sendRPY() {
+void sendAll() {
+  // roll,pitch,yaw,accX,accY,accZ,gyroX,gyroY,gyroZ,magX,magY,magZ,temp
   Serial.print(mpu.getRoll() - 31.31); Serial.print(",");
+  Serial.print(mpu.getPitch())       ; Serial.print(",");
+  Serial.print(mpu.getYaw())         ; Serial.print(",");
+  Serial.print(mpu.getAccX())        ; Serial.print(",");
+  Serial.print(mpu.getAccY())        ; Serial.print(",");
+  Serial.print(mpu.getAccZ())        ; Serial.print(",");
+  Serial.print(mpu.getGyroX())       ; Serial.print(",");
+  Serial.print(mpu.getGyroY())       ; Serial.print(",");
+  Serial.print(mpu.getGyroZ())       ; Serial.print(",");
+//Serial.print(mpu.getMagX())        ; Serial.print(",");
+  Serial.printf("%.2f", mpu.getMagX() / pow(10,27))        ; Serial.print(",");
+  Serial.print(mpu.getMagY())        ; Serial.print(",");
+  Serial.print(mpu.getMagZ())      ; Serial.print(",");
+  Serial.println(mpu.getTemperature());
+}
+
+void sendAllLoop() {
+  if(mpu.update()) {
+    static uint32_t prev_ms = millis();
+    if(millis() > prev_ms + 25) {
+      // sendAll();
+      // sendRPY();
+      Serial.println("abcdefg");
+      prev_ms = millis();
+    }
+  }
+}
+
+void sendRPY() {
+  Serial.print(mpu.getRoll() - 33.33); Serial.print(",");
   Serial.print(mpu.getPitch()); Serial.print(",");
   Serial.println(mpu.getYaw());
+}
+
+void sendRawData() {
+  // Serial.println("accX,accY,accZ,gyroX,gyroY,gyroZ,magX,magY,magZ");
+  Serial.print(mpu.getAccX()) ; Serial.print(",");
+  Serial.print(mpu.getAccY()) ; Serial.print(",");
+  Serial.print(mpu.getAccZ()) ; Serial.print(",");
+  Serial.print(mpu.getGyroX()); Serial.print(",");
+  Serial.print(mpu.getGyroY()); Serial.print(",");
+  Serial.print(mpu.getGyroZ()); Serial.print(",");
+  Serial.print(mpu.getMagX()) ; Serial.print(",");
+  Serial.print(mpu.getMagY()) ; Serial.print(",");
+  Serial.println(mpu.getMagZ());
+}
+
+void sendRawDataLoop() {
+  if(mpu.update()) {
+    static uint32_t prev_ms = millis();
+    if(millis() > prev_ms + 25) {
+      sendRawData();
+      prev_ms = millis();
+    }
+  }
 }
