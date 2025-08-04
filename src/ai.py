@@ -17,23 +17,19 @@ RED = (220, 0, 0)
 GREEN = (0, 200, 0)
 BLUE = (80, 180, 255)
 SKY = (120, 180, 255)
-# GROUND = (120, 100, 40)
 GROUND = (132, 157, 29)
 GRAY = (180, 180, 180)
 
 pygame.init()
 screen = pygame.display.set_mode((WIDTH, HEIGHT))
 pygame.display.set_caption('Attitude indicator')
-font = pygame.font.SysFont('Arial', 18)
-font_small = pygame.font.SysFont('Arial', 14)
+font = pygame.font.SysFont('Liberation Mono', 18)
+font_small = pygame.font.SysFont('Liberation Mono', 14)
 
-roll = 0.0
-pitch = 0.0
-yaw = 0.0
-last_data_time = 0
-serial_error = None
 
 class StdoutCatcher:
+    # Device class prints all serial to stdout
+    # it should be redirect to use properly
     def __init__(self, q):
         self.q = q
         self._buffer = ''
@@ -45,7 +41,27 @@ class StdoutCatcher:
     def flush(self):
         pass
 
+def data_reader_thread(q, error_q):
+    # uses StdoutCatcher to redirect stdout
+    # pushes all lines to queue
+    import sys as _sys
+    try:
+        esp32 = Device(None)
+        catcher = StdoutCatcher(q)
+        old_stdout = _sys.stdout
+        _sys.stdout = catcher
+        try:
+            esp32.sendBias()
+        finally:
+            _sys.stdout = old_stdout
+    except Exception as e:
+        error_q.put(str(e))
+
 def draw_horizon(surface, roll, pitch):
+    # SKY ve GROUND dikdörtgenlerini çizer ve 
+    # pitch değerine göre yüksekliklerini hesaplar
+    # roll değerine göre dikdörtgenleri döndürür
+    
     roll = -roll  # Reverse roll for correct direction
 
     pitch_offset =  pitch * 3
@@ -54,7 +70,7 @@ def draw_horizon(surface, roll, pitch):
 
     horizon_surface = pygame.Surface((W, H), pygame.SRCALPHA)
     horizon_center_y = H // 2
-    
+
     horizon_line_y = horizon_center_y + pitch_offset
 
     pygame.draw.rect(horizon_surface, SKY, (0, 0, W, horizon_line_y))
@@ -65,29 +81,11 @@ def draw_horizon(surface, roll, pitch):
 
     surface.blit(rotated_horizon, rect)
 
-    # Draw sky
-    # pygame.draw.rect(surface, SKY, (0, 0, WIDTH, CENTER_Y + pitch_offset))
-    # Draw ground
-    # pygame.draw.rect(surface, GROUND, (0, CENTER_Y + pitch_offset, WIDTH, HEIGHT - (CENTER_Y + pitch_offset)))
-
-    # Draw roll line
-    # horizon_y = CENTER_Y + pitch_offset
-    # horizon_y = CENTER_Y
-    # length = WIDTH
-    # x1 = CENTER_X - length // 2
-    # x2 = CENTER_X + length // 2
-    # y1 = horizon_y - math.tan(math.radians(roll)) * 15
-    # y2 = horizon_y + math.tan(math.radians(roll)) * 15
-    # pygame.draw.line(surface, WHITE, (x1, y1), (x2, y2), 3)
-
-def draw_pitch_ruler(surface, roll, pitch):
-    """
-    Draws a short roll line (120px) with pitch markers like a ruler.
-    Centered at the horizon, with 5 lines above, 5 below, and one at center.
-    Pitch values: -20, -10, 0, 10, 20.
-    """
+def draw_pitch_ruler(surface, roll):
+    # renders the lines to measure pitch.
+    # uses roll values to make it parallel with horizon
+    
     line_length = WIDTH // 5
-    num_lines = 5
     spacing = 30  # pixels between lines
     center_x = CENTER_X
     center_y = CENTER_Y
@@ -127,27 +125,6 @@ def draw_pitch_ruler(surface, roll, pitch):
 
         line_length = WIDTH // 5
 
-def draw_roll_scale(surface, roll):
-    roll = -roll  # Reverse roll for correct direction
-    radius = 120
-    for angle in range(-60, 61, 10):
-        rad = math.radians(angle - roll)
-        x1 = CENTER_X + radius * math.sin(rad)
-        y1 = CENTER_Y - 100 - radius * math.cos(rad)
-        x2 = CENTER_X + (radius - 15) * math.sin(rad)
-        y2 = CENTER_Y - 100 - (radius - 15) * math.cos(rad)
-        pygame.draw.line(surface, WHITE, (x1, y1), (x2, y2), 2)
-        if angle % 30 == 0:
-            label = font_small.render(str(angle), True, WHITE)
-            lx = CENTER_X + (radius - 30) * math.sin(rad) - label.get_width() // 2
-            ly = CENTER_Y - 100 - (radius - 30) * math.cos(rad) - label.get_height() // 2
-            surface.blit(label, (lx, ly))
-    pygame.draw.polygon(surface, RED, [
-        (CENTER_X - 15, CENTER_Y + 20),
-        (CENTER_X + 15, CENTER_Y + 20),
-        (CENTER_X, CENTER_Y)
-    ])
-
 def draw_compass(surface, yaw):
     # Compass in right bottom corner, use yaw directly
     yaw -= 180
@@ -176,38 +153,33 @@ def draw_compass(surface, yaw):
     ry = cy - (radius - head_len) * math.cos(right)
     pygame.draw.polygon(surface, RED, [(ax, ay), (lx, ly), (rx, ry)])
 
-def draw_overlays(surface, roll, pitch, yaw,
-                  accel, gyro, mag, temp,
-                  serial_error, last_data_time):
+def draw_overlays(  surface, roll, pitch, yaw,
+                    accel, gyro, mag, temp,
+                    serial_error, last_data_time):
+    
+    # renders sensor data and errors on screen
+    
     pygame.draw.rect(surface, BLACK, (0, 0, WIDTH, 30))
     pygame.draw.rect(surface, BLACK, (0, HEIGHT - 30, WIDTH, 30))
-    # compass = font.render('330   345   0   15   30', True, WHITE)
-    # surface.blit(compass, (CENTER_X - compass.get_width() // 2, 5))
-    # status = font.render('DISARMED', True, RED)
-    # surface.blit(status, (CENTER_X - status.get_width() // 2, CENTER_Y - 60))
-    # bat = font_small.render('Bat 12.59V 0.0A 100%', True, WHITE)
-    # gps = font_small.render('GPS: 3D Fix', True, WHITE)
-    # surface.blit(bat, (10, HEIGHT - 25))
-    # surface.blit(gps, (WIDTH - gps.get_width() - 10, HEIGHT - 25))
     rpy = font_small.render(f'Roll: {roll:.1f}  Pitch: {pitch:.1f}  Yaw: {yaw:.1f}', True, WHITE)
     surface.blit(rpy, (10, HEIGHT - 55))
 
     now = time.time()
 
-    accelstr = f"Accel : {accel[0]:.1f}, {accel[1]:.1f}, {accel[2]:.1f}"
-    gyrostr  = f"Gyro  : {gyro[0]:.1f}, {gyro[1]:.1f}, {gyro[2]:.1f}"
-    magstr   = f"Mag  : {mag[0]:.1f}, {mag[1]:.1f}, {mag[2]:.1f}"
-    tempstr  = f"Temp : {temp:.1f}"
+    accelstr = f"Accel: {accel[0]:.1f},{accel[1]:.1f},{accel[2]:.1f}"
+    gyrostr  = f"Gyro: {gyro[0]:.1f},{gyro[1]:.1f},{gyro[2]:.1f}"
+    magstr   = f"Mag: {mag[0]:.1f},{mag[1]:.1f},{mag[2]:.1f}"
+    tempstr  = f"Temp: {temp:.1f}"
 
     accel_render = font_small.render(accelstr , True, WHITE)
     gyro_render  = font_small.render(gyrostr  , True, WHITE)
     mag_render   = font_small.render(magstr   , True, WHITE)
     temp_render  = font_small.render(tempstr  , True, WHITE)
 
-    surface.blit(accel_render, (WIDTH - 180, HEIGHT - 220))
-    surface.blit(gyro_render , (WIDTH - 180, HEIGHT - 205))
-    surface.blit(mag_render  , (WIDTH - 180, HEIGHT - 190))
-    surface.blit(temp_render , (WIDTH - 180, HEIGHT - 175))
+    surface.blit(accel_render, (WIDTH - 190, HEIGHT - 220))
+    surface.blit(gyro_render , (WIDTH - 190, HEIGHT - 205))
+    surface.blit(mag_render  , (WIDTH - 190, HEIGHT - 190))
+    surface.blit(temp_render , (WIDTH - 190, HEIGHT - 175))
 
     if serial_error:
         err = font.render(f'Serial error: {serial_error}', True, RED)
@@ -216,38 +188,13 @@ def draw_overlays(surface, roll, pitch, yaw,
         warn = font.render('No data from device!', True, RED)
         surface.blit(warn, (CENTER_X - warn.get_width() // 2, HEIGHT // 2))
 
-def data_reader_thread(q, error_q):
-    import sys as _sys
-    try:
-        esp32 = Device()
-        catcher = StdoutCatcher(q)
-        old_stdout = _sys.stdout
-        _sys.stdout = catcher
-        try:
-            esp32.sendBias()
-        finally:
-            _sys.stdout = old_stdout
-    except Exception as e:
-        error_q.put(str(e))
-
 def draw_roll_arc(surface, roll, center_x=CENTER_X, top_margin=110, arc_radius=120):
-    """
-    Draws a static 120° arc at the top center of the screen, with tick marks and labels.
-    A red triangle pointer moves along the arc to indicate the current roll value.
-    - roll: current roll value in degrees (expected range: -60 to +60)
-    - center_x: horizontal center of the arc
-    - top_margin: vertical offset from the top of the screen
-    - arc_radius: radius of the arc
-    """
+
+    # renders an angle meter to show roll data top of the screen
+
     arc_center = (center_x, top_margin + arc_radius)
     arc_start = -150  # leftmost angle (degrees, 0=right, 90=down)
     arc_end = -30     # rightmost angle
-
-    # Draw arc (using pygame.draw.arc, which needs a rect and start/end radians)
-    # rect = pygame.Rect(arc_center[0] - arc_radius, arc_center[1] - arc_radius, 2*arc_radius, 2*arc_radius)
-    # for offset in range(-1, 2):  # -1, 0, 1 for a 3-pixel thick arc
-    #     rect2 = pygame.Rect(rect.x + offset, rect.y + offset, rect.width - 2*offset, rect.height - 2*offset)
-    #     pygame.draw.arc(surface, WHITE, rect2, math.radians(arc_start), math.radians(arc_end), 1)
 
     # Draw tick marks and labels
     for angle in range(arc_start, arc_end+1, 10):  # every 10°
@@ -285,11 +232,6 @@ def draw_roll_arc(surface, roll, center_x=CENTER_X, top_margin=110, arc_radius=1
     pygame.draw.polygon(surface, RED, [p2, p3, p_tip])
 
 def draw_compass_strip(surface, yaw, margin=30, strip_width=500, strip_height=36):
-    """
-    Draws a horizontal compass strip at the top of the screen.
-    The center of the strip always represents the current yaw.
-    Ticks and labels move smoothly as yaw changes.
-    """
     cx = WIDTH // 2
     top = margin
     left = cx - strip_width // 2
@@ -341,22 +283,24 @@ def draw_compass_strip(surface, yaw, margin=30, strip_width=500, strip_height=36
         (tri_x - tri_w // 2, tri_y - tri_h),
         (tri_x + tri_w // 2, tri_y - tri_h)
     ])
-# roll,pitch,yaw,accX,accY,accZ,gyroX,gyroY,gyroZ,magX,magY,magZ,temp
+
+# serial port data format:
+#   roll,pitch,yaw,accX,accY,accZ,gyroX,gyroY,gyroZ,magX,magY,magZ,temp
 def main():
-    # global roll, pitch, yaw, last_data_time, serial_error
-    # global rpy, accel, gyro, mag, temp,
     last_data_time = 0
-    serial_error = 0
-    rpy   = [0.0, 0.0, 0.0]
+    serial_error = None
+
+    rpy   = [0.0, 0.0, 0.0] # roll-pitch-yaw
     accel = [0.0, 0.0, 0.0]
     gyro  = [0.0, 0.0, 0.0]
     mag   = [0.0, 0.0, 0.0]
-    temp = 0
+    temp = 0                # temprature
 
     clock = pygame.time.Clock()
     data_q = queue.Queue()
     error_q = queue.Queue()
-    t = threading.Thread(target=data_reader_thread, args=(data_q, error_q), daemon=True)
+    t = threading.Thread(   target=data_reader_thread,
+                            args=(data_q, error_q), daemon=True)
     t.start()
 
     running = True
@@ -371,7 +315,6 @@ def main():
                 line = line.strip()
                 if line and (',' in line):
                     parts = line.split(',')
-                    # if len(parts) == 3:
                     if len(parts) == 13:
                         try:
                             rpy[0],   rpy[1],   rpy[2]   = map(float, parts[0:3])
@@ -390,16 +333,14 @@ def main():
         except queue.Empty:
             pass
         screen.fill(BLACK)
-        # FIXME fix all rpy parameters
-        draw_horizon      (screen, rpy[0], rpy[1])
-        draw_pitch_ruler  (screen, rpy[0], rpy[1])
-        draw_roll_arc     (screen, rpy[0])
-        # draw_roll_scale (screen, rpy[0])
-        draw_compass      (screen, rpy[2])
-        draw_compass_strip(screen, rpy[2])
-        draw_overlays     (screen, rpy[0], rpy[1], rpy[2],
-                           accel, gyro, mag, temp,
-                           serial_error, last_data_time)
+        draw_horizon      ( screen, rpy[0], rpy[1])
+        draw_pitch_ruler  ( screen, rpy[0])
+        draw_roll_arc     ( screen, rpy[0])
+        draw_compass      ( screen, rpy[2])
+        draw_compass_strip( screen, rpy[2])
+        draw_overlays     ( screen, rpy[0], rpy[1], rpy[2],
+                            accel, gyro, mag, temp,
+                            serial_error, last_data_time)
         pygame.display.flip() # swaps the display buffer
         clock.tick(60)
     pygame.quit()
