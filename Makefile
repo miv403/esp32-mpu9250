@@ -4,12 +4,7 @@ BOARD_FQBN = esp32:esp32:esp32:UploadSpeed=115200
 
 PORT = /dev/ttyUSB0
 BAUD = 115200
-# SKETCH = write-serial.ino
-# SKETCH = simple-serial-comm
-# SKETCH = send-struct
-# SKETCH = send-sensor-data
-# SKETCH = serial-comm
-SKETCH = main
+SKETCH = esp32
 BUILD_DIR = build
 
 # === AUTOMATIC SKETCH DIR NAME ===

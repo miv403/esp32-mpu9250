@@ -57,7 +57,7 @@ void setup() {
 
       if(cmd == CMD_CALIBRATE_ACCL
       || cmd == CMD_CALIBRATE_GYRO
-      || cmd == CMD_CALIBRATE_MAGN) { // TODO test calibration
+      || cmd == CMD_CALIBRATE_MAGN) {
         startCalibration(cmd);
       }
       else if(cmd == CMD_SEND_RAW) {
