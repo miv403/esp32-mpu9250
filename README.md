@@ -1,5 +1,13 @@
 # ESP32 MPU-9250
 
+- [ESP32 MPU-9250](#esp32-mpu-9250)
+  - [Çalıştırma](#çalıştırma)
+  - [Elle Çalıştırma](#elle-çalıştırma)
+    - [Kalibrasyon](#kalibrasyon)
+    - [Durum Göstergesi](#durum-göstergesi)
+  - [ESP32'ye Programı Yükleme](#esp32ye-programı-yükleme)
+  - [Bağımlılıklar](#bağımlılıklar)
+
 ESP32 ile MPU-9250 sensör kalibrasyonu, füzyonu ve görselleştirilmesi.
 
 ## Çalıştırma
@@ -14,11 +22,11 @@ chmod +x run.sh
 ./run.sh
 ```
 
-### Elle Çalıştırma
+## Elle Çalıştırma
 
 Eğer `run.sh` ile çalıştırmak istemiyorsanız ya da çalıştıramıyorsanız elle çalıştırmak için aşağıdaki komut satırı parametrelerini kullanabilirsiniz.
 
-#### Kalibrasyon
+### Kalibrasyon
 
 Sensörlerin kalibrasyonu aşağıdaki parametreler ile ayrı ayrı yapılabilir. *Not: accel ve gyro parametreleri aynı anda ivmeölçeri ve jiroskobu kalibre etmektedir. Birini çalıştırmanız ikisini de kalibre edecektir.*
 
@@ -31,10 +39,25 @@ python main.py --calibrate <option>
 
 **Magnetometre** kalibrasyonu yapılırken sensörü şeklinde hareket ettirin.
 
-#### Durum Göstergesi
+### Durum Göstergesi
 
 ```console
 python ai.py
 ```
 
 ![Attitude indicator screenshot](./img/ai.png)
+
+## ESP32'ye Programı Yükleme
+
+Sisteminizde `make` ve `arduino-cli` yüklü ise aşağıdaki komut ile programı kolayca derleyip yükleyebilirsiniz.
+
+```console
+make upload
+```
+
+## Bağımlılıklar
+
+```requirements
+pygame==2.6.1
+pyserial==3.5
+```
