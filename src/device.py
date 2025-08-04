@@ -31,44 +31,30 @@ class Timestamp: # json çıktıları için zaman damgası nesnesi
 ts = Timestamp()
 
 class Device:
-    def __init__(self) -> None:
-        # TODO add mode parameter to take args from cmdline
+    def __init__(self, mode = "send") -> None:
+        try:
+            self.recvLine()
+            if mode == "send":
+                self.sendBias()
+            elif mode == "accel":
+                self.startCalibration(CMD_CALIBRATE_ACCL)
+            elif mode == "gyro":
+                self.startCalibration(CMD_CALIBRATE_GYRO)
+            elif mode == "mag":
+                self.startCalibration(CMD_CALIBRATE_MAGN)
+            elif mode == None:
+                pass
+        finally:
+            ser.flush()
+            ser.close()
         sleep(0.5)
-        # TODO if mode calibrate then CMD_CALIBRATE
-        # elif get data
 
     def _readline(self):
         return ser.readline().decode('utf-8').strip()
-
     def _sendCommand(self, cmd):
         ser.write(cmd)
     def _writeLine(self, data):
         ser.write(data.encode("utf-8"))
-
-    def recvLine(self):
-        line = ser.readline().decode('utf-8').strip() + "\n"
-        print(line)
-
-    def startCalibration(self,type):
-        self._sendCommand(type)
-
-        bias = []
-
-        output = self._readline()
-        while output != CALIB_DONE:
-            output = self._readline()
-            if output == "" or output == None:
-                continue
-            print(output)
-            if output == CALIB_DATA:
-                output = self._readline()
-                bias.append(output)
-                print(output)
-                output = self._readline()
-                bias.append(output)
-                print(output)
-
-        self._saveBias(type, bias)
 
     def _saveBias(self, type, bias):
         csv_file = StringIO("\n".join(bias))
@@ -103,26 +89,6 @@ class Device:
         with open(filename, 'w') as f:
             json.dump(biasDict, f, indent=4)
 
-    def sendBias(self):
-        data = self._getBias()
-        print(data)
-
-        self._sendCommand(CMD_SAVE_BIAS)
-        self._writeLine(data)
-        # sleep(0.05)
-        print(self._readline())
-        output = self._readline()
-        print(output)
-        while output != CALIB_DONE:
-            output = self._readline()
-            if output == "" or output == None:
-                print("continue")
-                continue
-            print(output)
-        # self.readRaw()
-        # self.readRPY()
-        self.readAll()
-
     def _getBias(self):
         # Bias verilerini oku
         accelGyroJson = open(ACCEL_GYRO_FILE, "r")
@@ -141,28 +107,48 @@ class Device:
                                     max_line_width=100)[1:-1].replace(' ', '')
         return biasData
 
-    # def readRaw(self):
-    #     self._sendCommand(CMD_SEND_RAW)
-    #     sleep(0.05)
-    #     output = self._readline()
-    #     print(output)
-    #     while True:
-    #         output = self._readline()
-    #         if output == "" or output == None:
-    #             continue
-    #         print(output)
+    def recvLine(self):
+        line = ser.readline().decode('utf-8').strip() + "\n"
+        print(line)
 
-    # def readRPY(self):
-    #     self._sendCommand(CMD_SEND_FILTERED)
-    #     sleep(0.05)
-    #     output = self._readline()
-    #     print(output)
-    #     while True:
-    #         output = self._readline()
-    #         if output == "" or output == None:
-    #             print("continue rpy")
-    #             continue
-    #         print(output)
+    def startCalibration(self,type):
+        self._sendCommand(type)
+
+        bias = []
+
+        output = self._readline()
+        while output != CALIB_DONE:
+            output = self._readline()
+            if output == "" or output == None:
+                continue
+            print(output)
+            if output == CALIB_DATA:
+                output = self._readline()
+                bias.append(output)
+                print(output)
+                output = self._readline()
+                bias.append(output)
+                print(output)
+
+        self._saveBias(type, bias)
+
+    def sendBias(self):
+        data = self._getBias()
+        print(data)
+
+        self._sendCommand(CMD_SAVE_BIAS)
+        self._writeLine(data)
+        print(self._readline())
+        output = self._readline()
+        print(output)
+        while output != CALIB_DONE:
+            output = self._readline()
+            if output == "" or output == None:
+                print("continue")
+                continue
+            print(output)
+
+        self.readAll()
 
     def readAll(self):
         self._sendCommand(CMD_SEND_ALL)
@@ -173,5 +159,5 @@ class Device:
             output = self._readline()
             if output == "" or output == None:
                 print("continue readAll")
-                # continue
+                continue
             print(output)
