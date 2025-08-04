@@ -46,12 +46,12 @@ def data_reader_thread(q, error_q):
     # pushes all lines to queue
     import sys as _sys
     try:
-        esp32 = Device(None)
+        esp32 = None
         catcher = StdoutCatcher(q)
         old_stdout = _sys.stdout
         _sys.stdout = catcher
         try:
-            esp32.sendBias()
+            esp32 = Device()
         finally:
             _sys.stdout = old_stdout
     except Exception as e:
